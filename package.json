@@ -1,0 +1,22 @@
+{
+  "name": "graph-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Figma dev plugin: ECharts-style charts built from design-system variables",
+  "type": "module",
+  "scripts": {
+    "tokens": "node scripts/tokens-to-ts.mjs",
+    "build": "npm run tokens && node build.mjs",
+    "dev": "npm run tokens && node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings scripts/test-core.ts"
+  },
+  "dependencies": {
+    "preact": "^10.24.0"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.100.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0"
+  }
+}
