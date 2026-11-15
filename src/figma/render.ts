@@ -5,11 +5,13 @@
 // usable when the frame is resized by hand: Title (center/top) · body · Legend (center/bottom).
 
 import { computeLayout, type FrameLayout } from '../core/layout';
+import { displaySpec } from '../data/display';
 import { colorTokenName, type ChartSpec, type ChartType } from '../shared/types';
 import type { ThemeSpec } from '../theme/echarts';
 import { renderCartesian } from './cartesian';
 import { constrain, ellipse, stroke, vector, type Ctx } from './nodes';
 import { renderPie, renderRadar } from './polar';
+import { renderScene } from './scene';
 import { createText } from './textStyles';
 import { ColorResolver } from './variables';
 
@@ -21,6 +23,7 @@ export const TYPE_NAMES: Record<ChartType, string> = {
   pie: 'Pie',
   scatter: 'Scatter',
   radar: 'Radar',
+  heatmap: 'Heatmap', graph: 'Graph', treemap: 'Treemap', sankey: 'Sankey', gantt: 'Gantt',
 };
 
 export interface RenderResult {
@@ -29,7 +32,10 @@ export interface RenderResult {
 }
 
 export async function renderChart(spec: ChartSpec, theme: ThemeSpec, target?: FrameNode): Promise<RenderResult> {
+  const sourceSpec = spec;
+  spec = displaySpec(spec);
   const L = computeLayout(spec, theme);
+  if (L.type === 'scene' && L.errors.length) throw new Error(L.errors.join('\n'));
   const colors = await ColorResolver.create();
 
   const frame = target ?? figma.createFrame();
@@ -45,7 +51,8 @@ export async function renderChart(spec: ChartSpec, theme: ThemeSpec, target?: Fr
   const ctx: Ctx = { frame, spec, theme, colors };
   if (L.type === 'cartesian') await renderCartesian(ctx, L);
   else if (L.type === 'pie') await renderPie(ctx, L);
-  else await renderRadar(ctx, L);
+  else if (L.type === 'radar') await renderRadar(ctx, L);
+  else await renderScene(ctx, L);
 
   // ---------- Title ----------
   if (spec.options.showTitle && spec.title) {
@@ -59,7 +66,7 @@ export async function renderChart(spec: ChartSpec, theme: ThemeSpec, target?: Fr
 
   await renderLegend(ctx, L.frame);
 
-  frame.setPluginData(SPEC_KEY, JSON.stringify(spec));
+  frame.setPluginData(SPEC_KEY, JSON.stringify(sourceSpec));
   return { frame, missingVariables: [...colors.missing] };
 }
 

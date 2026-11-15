@@ -46,7 +46,8 @@ export interface FrameLayout {
 
 export function frameLayout(spec: ChartSpec, theme: ThemeSpec, entries: { label: string; color: ColorRef }[], icon: LegendIcon): FrameLayout {
   const { width: W, height: H, options: o } = spec;
-  const p = theme.padding;
+  const compact = spec.type === 'line' && !o.axis.showX && !o.axis.showY && !o.showTitle && !o.showLegend;
+  const p = compact ? { top: 8, bottom: 8 } : theme.padding;
   const lg = theme.legend;
   const top = p.top + (o.showTitle && spec.title ? theme.titleHeight : 0);
 

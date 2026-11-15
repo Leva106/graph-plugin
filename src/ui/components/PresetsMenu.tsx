@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Preset } from '../../shared/messages';
 import { ChartIcon } from './icons';
+import { TYPE_LABELS } from '../state';
 
 interface Props {
+  disabled?: boolean;
   presets: Preset[];
   defaultName: string;
   onSave: (name: string) => void;
@@ -20,7 +22,7 @@ const date = (ms: number) => {
  * Saved charts (full spec with data and size). Pick one → it is loaded into the editor to tweak and create /
  * update a chart. Presets are not updated in place: save a new one, delete the old one.
  */
-export function PresetsMenu({ presets, defaultName, onSave, onApply, onDelete }: Props) {
+export function PresetsMenu({ presets, defaultName, onSave, onApply, onDelete, disabled }: Props) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -39,6 +41,7 @@ export function PresetsMenu({ presets, defaultName, onSave, onApply, onDelete }:
   }, [open]);
 
   const save = () => {
+    if (disabled) return;
     onSave(name.trim() || defaultName);
     setName('');
   };
@@ -85,7 +88,7 @@ export function PresetsMenu({ presets, defaultName, onSave, onApply, onDelete }:
                     <span class="preset-text">
                       <span class="preset-name">{p.name}</span>
                       <span class="preset-meta">
-                        {p.spec.width}×{p.spec.height} · {p.spec.categories.length}×{p.spec.series.length} · {date(p.createdAt)}
+                        {p.spec.width}×{p.spec.height} · {TYPE_LABELS[p.spec.type]} · {date(p.createdAt)}
                       </span>
                     </span>
                   </button>
@@ -115,7 +118,7 @@ export function PresetsMenu({ presets, defaultName, onSave, onApply, onDelete }:
               onInput={(e) => setName((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => e.key === 'Enter' && save()}
             />
-            <button type="button" class="primary small" onClick={save}>
+            <button type="button" class="primary small" disabled={disabled} onClick={save}>
               Сохранить
             </button>
           </div>

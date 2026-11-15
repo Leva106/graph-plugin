@@ -1,6 +1,8 @@
 import { CATEGORY_PRESETS } from '../../data/random';
 import { addSeries, removeSeries } from '../../data/table';
 import type { SelectedFrame } from '../../shared/messages';
+import { isStructured } from '../../shared/types';
+import { StructuredEditor } from '../components/StructuredEditor';
 import { ColorPicker } from '../components/ColorPicker';
 import { Chips, NumberField, Row, Section, Segmented, Select, Stepper, TextField } from '../components/controls';
 import { DataTable } from '../components/DataTable';
@@ -32,7 +34,7 @@ export function DataTab({ ed, frame, onOpenCsv }: { ed: Editor; frame: SelectedF
         </div>
         <Row label="Ширина × высота">
           <div class="pair">
-            <NumberField value={ed.width} min={200} max={4000} onChange={ed.setWidth} suffix="W" />
+            <NumberField value={ed.width} min={64} max={4000} onChange={ed.setWidth} suffix="W" />
             <button
               type="button"
               class={`icon-btn lock${ed.ratio ? ' on' : ''}`}
@@ -45,7 +47,7 @@ export function DataTab({ ed, frame, onOpenCsv }: { ed: Editor; frame: SelectedF
                 <path d={ed.ratio ? 'M4 5.5V4a2 2 0 0 1 4 0v1.5' : 'M4 5.5V4a2 2 0 0 1 3.8-.9'} fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
               </svg>
             </button>
-            <NumberField value={ed.height} min={150} max={4000} onChange={ed.setHeight} suffix="H" />
+            <NumberField value={ed.height} min={40} max={4000} onChange={ed.setHeight} suffix="H" />
           </div>
         </Row>
         {cat && cat.total > 1 && (
@@ -57,6 +59,8 @@ export function DataTab({ ed, frame, onOpenCsv }: { ed: Editor; frame: SelectedF
         )}
       </Section>
 
+      {isStructured(type) ? <StructuredEditor key={type} ed={ed} /> : <>
+      {ed.typeNotice && <p class="hint pad">{ed.typeNotice}</p>}
       <Section
         title="Данные"
         aside={
@@ -145,6 +149,7 @@ export function DataTab({ ed, frame, onOpenCsv }: { ed: Editor; frame: SelectedF
       {ed.sourceKind === 'table' && <p class="hint pad">Вставьте диапазон из Excel или Google Sheets в любую ячейку — таблица расширится. Первая строка без чисел станет названиями серий.</p>}
       {type === 'pie' && table.data.length > 1 && <p class="hint pad">Круговая диаграмма строится по первой серии. Цвета секторов — во вкладке «Вид».</p>}
       {type === 'scatter' && ed.sourceKind === 'table' && <p class="hint pad">Первая колонка — значения X (числа).</p>}
+      </>}
     </>
   );
 }

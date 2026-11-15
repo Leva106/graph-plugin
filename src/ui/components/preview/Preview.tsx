@@ -1,12 +1,15 @@
 import type { ChartLayout, FrameLayout } from '../../../core/layout';
+import { displaySpec } from '../../../data/display';
 import { colorTokenName, type ChartSpec } from '../../../shared/types';
 import type { ThemeSpec } from '../../../theme/echarts';
 import { CartesianBody } from './Cartesian';
+import { SceneBody } from './Scene';
 import { PieBody, RadarBody } from './Polar';
 import { hex } from './shared';
 
 /** SVG preview built from the same layout as the Figma renderer. */
 export function Preview({ spec, theme, layout: L }: { spec: ChartSpec; theme: ThemeSpec; layout: ChartLayout }) {
+  spec = displaySpec(spec);
   const c = theme.colors;
   return (
     <svg class="preview-svg" viewBox={`0 0 ${spec.width} ${spec.height}`} preserveAspectRatio="xMidYMid meet" font-family="Inter, -apple-system, 'Segoe UI', sans-serif">
@@ -14,6 +17,7 @@ export function Preview({ spec, theme, layout: L }: { spec: ChartSpec; theme: Th
       {L.type === 'cartesian' && <CartesianBody L={L} spec={spec} theme={theme} />}
       {L.type === 'pie' && <PieBody L={L} spec={spec} theme={theme} />}
       {L.type === 'radar' && <RadarBody L={L} spec={spec} theme={theme} />}
+      {L.type === 'scene' && <SceneBody L={L} />}
       {spec.options.showTitle && spec.title && (
         <text x={spec.width / 2} y={L.frame.titleY} text-anchor="middle" dominant-baseline="hanging" font-size={theme.fonts.title.size} font-weight="600" fill={hex(c.title)}>
           {spec.title}

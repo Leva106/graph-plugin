@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import type { Preset, SelectedFrame, TextStyleInfo, ToSandbox, ToUi } from '../shared/messages';
 import type { ChartType, TextStyleIds } from '../shared/types';
 import { echartsTheme } from '../theme/echarts';
-import { Segmented, type SegmentedOption } from './components/controls';
+import { Segmented, Select } from './components/controls';
 import { CsvModal } from './components/CsvModal';
-import { ChartIcon } from './components/icons';
 import { PresetsMenu } from './components/PresetsMenu';
 import { Preview } from './components/preview/Preview';
 import { guessStyle, TYPE_LABELS, useChartEditor } from './state';
@@ -19,7 +18,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'view', label: 'Вид' },
 ];
 
-const TYPE_OPTIONS: SegmentedOption<ChartType>[] = (Object.keys(TYPE_LABELS) as ChartType[]).map((id) => ({ id, label: TYPE_LABELS[id], icon: <ChartIcon type={id} /> }));
+const TYPE_OPTIONS = (Object.keys(TYPE_LABELS) as ChartType[]).map((id) => ({ id, label: TYPE_LABELS[id] }));
 
 type Status = { kind: 'ok' | 'warn' | 'error'; text: string } | null;
 
@@ -103,6 +102,7 @@ export function App() {
   };
 
   const submit = (mode: 'create' | 'update' | 'insert') => {
+    if (ed.errors.length) return;
     setBusy(true);
     setStatus(null);
     if (mode === 'update' && editing) send({ type: 'update', id: editing.id, spec: ed.spec });
@@ -141,12 +141,13 @@ export function App() {
         )}
         <div class="type-row">
           <div class="type-picker">
-            <Segmented value={ed.type} options={TYPE_OPTIONS} onChange={ed.changeType} />
+            <Select value={ed.type} options={TYPE_OPTIONS} onChange={ed.changeType} />
           </div>
           <PresetsMenu
             presets={presets}
             defaultName={ed.title || TYPE_LABELS[ed.type]}
-            onSave={(name) => send({ type: 'save-preset', name, spec: ed.spec })}
+            disabled={!!ed.errors.length}
+            onSave={(name) => { if (!ed.errors.length) send({ type: 'save-preset', name, spec: ed.spec }); }}
             onApply={applyPreset}
             onDelete={(id) => send({ type: 'delete-preset', id })}
           />
@@ -161,27 +162,29 @@ export function App() {
       </div>
 
       <footer class="footer">
+        {('warnings' in ed.layout) && ed.layout.warnings.slice(0, 2).map(w => <div class="status warn" key={w}>{w}</div>)}
+        {!!ed.errors.length && <div class="status error">Исправьте ошибки во вкладке «Данные».</div>}
         {status && <div class={`status ${status.kind}`}>{status.text}</div>}
         {editing ? (
           <div class="actions">
-            <button type="button" class="secondary" disabled={busy} onClick={() => submit('create')}>
+            <button type="button" class="secondary" disabled={busy || !!ed.errors.length} onClick={() => submit('create')}>
               Создать новый
             </button>
-            <button type="button" class="primary" disabled={busy} onClick={() => submit('update')}>
+            <button type="button" class="primary" disabled={busy || !!ed.errors.length} onClick={() => submit('update')}>
               {busy ? 'Обновляю…' : 'Обновить график'}
             </button>
           </div>
         ) : frame ? (
           <div class="actions">
-            <button type="button" class="secondary" disabled={busy} onClick={() => submit('create')}>
+            <button type="button" class="secondary" disabled={busy || !!ed.errors.length} onClick={() => submit('create')}>
               Создать отдельно
             </button>
-            <button type="button" class="primary" disabled={busy} onClick={() => submit('insert')} title={`${frame.width} × ${frame.height}, растягивается вместе с фреймом`}>
+            <button type="button" class="primary" disabled={busy || !!ed.errors.length} onClick={() => submit('insert')} title={`${frame.width} × ${frame.height}, растягивается вместе с фреймом`}>
               {busy ? 'Вставляю…' : `Вставить в «${frame.name}»`}
             </button>
           </div>
         ) : (
-          <button type="button" class="primary" disabled={busy} onClick={() => submit('create')}>
+          <button type="button" class="primary" disabled={busy || !!ed.errors.length} onClick={() => submit('create')}>
             {busy ? 'Создаю…' : 'Создать график'}
           </button>
         )}

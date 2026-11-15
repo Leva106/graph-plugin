@@ -22,6 +22,7 @@ export interface ThemeSpec {
   /** min free space between neighbouring category labels (ECharts auto interval) */
   minLabelGap: number;
   lineWidth: number;
+  threshold: { color: string; width: number; dash: number[] };
   symbolSize: number;
   symbolStrokeWidth: number;
   smoothness: number;
@@ -56,6 +57,7 @@ export const echartsTheme: ThemeSpec = {
   splitDensity: { vertical: 48, horizontal: 90 },
   minLabelGap: 12,
   lineWidth: 2,
+  threshold: { color: 'system/graphite/600', width: 1, dash: [5, 4] },
   symbolSize: 6,
   symbolStrokeWidth: 1.5,
   smoothness: 0.5,

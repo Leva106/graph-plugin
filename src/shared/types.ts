@@ -6,8 +6,21 @@ export interface ColorRef {
   tone: string; // "300" … "700"
 }
 
-export type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'radar';
-export const CHART_TYPES: ChartType[] = ['line', 'bar', 'pie', 'scatter', 'radar'];
+export type StructuredType = 'heatmap' | 'graph' | 'treemap' | 'sankey' | 'gantt';
+export type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'radar' | StructuredType;
+export const CHART_TYPES: ChartType[] = ['line', 'bar', 'pie', 'scatter', 'radar', 'heatmap', 'graph', 'treemap', 'sankey', 'gantt'];
+export const isStructured = (type: ChartType): type is StructuredType => ['heatmap', 'graph', 'treemap', 'sankey', 'gantt'].includes(type);
+
+export interface NetworkNode { id: string; name: string; group: string }
+export interface NetworkLink { source: string; target: string }
+export interface TreeItem { id: string; parent: string; name: string; value: number | null }
+export interface GanttTask { id: string; name: string; start: number; end: number }
+export type StructuredData =
+  | { kind: 'heatmap'; hours: string[]; days: string[]; values: Value[][] }
+  | { kind: 'graph'; nodes: NetworkNode[]; links: NetworkLink[] }
+  | { kind: 'sankey'; nodes: NetworkNode[]; links: (NetworkLink & { value: number })[] }
+  | { kind: 'treemap'; items: TreeItem[] }
+  | { kind: 'gantt'; tasks: GanttTask[] };
 
 /** `null` = empty table cell (skipped by the chart). */
 export type Value = number | null;
@@ -20,6 +33,9 @@ export interface SeriesSpec {
 
 /** One flat object for every chart type, so switching the type keeps the settings. */
 export interface ChartOptions {
+  directed: boolean;
+  threshold: { enabled: boolean; value: number };
+  topN: { enabled: boolean; count: number; series: number };
   // line (+ radar: area / areaOpacity / showSymbols)
   smooth: boolean;
   area: boolean;
@@ -55,6 +71,8 @@ export interface NumberFormat {
 }
 
 export interface AxisOptions {
+  showX: boolean;
+  showY: boolean;
   min: number | null; // null = auto
   max: number | null;
   titleX: string; // bottom axis title
@@ -64,9 +82,12 @@ export interface AxisOptions {
 }
 
 export const DEFAULT_FORMAT: NumberFormat = { prefix: '', suffix: '', decimals: 'auto', compact: false, separators: 'en' };
-export const DEFAULT_AXIS: AxisOptions = { min: null, max: null, titleX: '', titleY: '', grid: true, ticks: true };
+export const DEFAULT_AXIS: AxisOptions = { showX: true, showY: true, min: null, max: null, titleX: '', titleY: '', grid: true, ticks: true };
 
 export const DEFAULT_OPTIONS: ChartOptions = {
+  directed: false,
+  threshold: { enabled: false, value: 0 },
+  topN: { enabled: false, count: 10, series: 0 },
   smooth: true,
   area: false,
   areaOpacity: 0.3,
@@ -94,11 +115,12 @@ export type DataSource =
   | { kind: 'random'; seriesCount: number; points: number | 'auto'; min: number; max: number; seed: number; preset: string }
   | { kind: 'table' };
 
-export const SPEC_VERSION = 3;
+export const SPEC_VERSION = 5;
 
 export interface ChartSpec {
-  version: 3;
+  version: typeof SPEC_VERSION;
   type: ChartType;
+  structured?: StructuredData;
   source?: DataSource;
   title: string;
   width: number;

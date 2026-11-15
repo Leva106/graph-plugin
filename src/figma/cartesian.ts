@@ -109,6 +109,15 @@ export async function renderCartesian(ctx: Ctx, L: CartesianLayout) {
     for (const m of L.labels) if (m.series === si) await markText(ctx, box, m, labelPaint, -g.x, -g.y);
   }
 
+  if (L.threshold) {
+    const paint = await colors.paint(theme.threshold.color);
+    const v = vector(plot, `M 0 ${ly(L.threshold.y)} L ${g.w} ${ly(L.threshold.y)}`, 'Threshold');
+    stroke(v, paint, theme.threshold.width);
+    v.dashPattern = theme.threshold.dash;
+    constrain(v, 'SCALE', 'SCALE');
+    await markText(ctx, plot, L.threshold.label, paint, -g.x, -g.y, 'Threshold');
+  }
+
   // ---------- Axis Y: strip left of the plot, stretches vertically ----------
   const axisTextPaint = await colors.paint(c.axisLabel);
   const yStrip = container(frame, 'Axis Y', 0, g.y, g.x, g.h);

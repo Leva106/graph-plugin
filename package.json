@@ -9,7 +9,7 @@
     "build": "npm run tokens && node build.mjs",
     "dev": "npm run tokens && node build.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings scripts/test-core.ts"
+    "test": "node --experimental-strip-types --no-warnings scripts/test-core.ts && node --experimental-strip-types --no-warnings scripts/test-structured.ts && node scripts/test-native.mjs"
   },
   "dependencies": {
     "preact": "^10.24.0"

@@ -35,6 +35,11 @@ export function ChartIcon({ type }: { type: ChartType }) {
           <path d="M8 5 11 7.2 9.8 11H6.4L5.2 7.3Z" fill="currentColor" opacity="0.5" />
         </g>
       )}
+      {type === 'graph' && <g {...P}><circle cx="8" cy="3" r="1.5" /><circle cx="3" cy="12" r="1.5" /><circle cx="13" cy="12" r="1.5" /><path d="M7 4.5 4 10.5M9 4.5l3 6M4.5 12h7" /></g>}
+      {type === 'heatmap' && <g fill="currentColor">{[0, 1, 2].flatMap(r => [0, 1, 2].map(c => <rect key={`${r}${c}`} x={1 + c * 5} y={1 + r * 5} width="4" height="4" opacity={0.25 + (r + c) * 0.18} />))}</g>}
+      {type === 'treemap' && <g {...P}><rect x="1.5" y="1.5" width="13" height="13" /><path d="M7 1.5v13M7 8h7.5" /></g>}
+      {type === 'sankey' && <g {...P}><path d="M2 2v12M14 2v12M2 4C8 4 8 10 14 10M2 10C8 10 8 4 14 4" /></g>}
+      {type === 'gantt' && <g stroke="currentColor" stroke-width="3"><path d="M1 3h6M5 8h6M9 13h6" /></g>}
     </svg>
   );
 }

@@ -10,7 +10,8 @@ import { computeLayout } from '../src/core/layout/index.ts';
 import { pieSlices } from '../src/core/layout/pie.ts';
 import { pasteBlock, addRow, removeRow, parseGrid, gridToTable } from '../src/data/table.ts';
 import { migrateSpec } from '../src/shared/migrate.ts';
-import { CHART_TYPES, DEFAULT_AXIS, DEFAULT_FORMAT, DEFAULT_OPTIONS, type ChartSpec, type NumberFormat } from '../src/shared/types.ts';
+import { CHART_TYPES, DEFAULT_AXIS, DEFAULT_FORMAT, DEFAULT_OPTIONS, SPEC_VERSION, type ChartSpec, type NumberFormat } from '../src/shared/types.ts';
+import { displaySpec } from '../src/data/display.ts';
 import { echartsTheme } from '../src/theme/echarts.ts';
 
 const s = niceScale(0, 2573);
@@ -76,7 +77,7 @@ assert.ok(valueAxis(0, 1000, 90, 48, 5).ticks.length < valueAxis(0, 1000, 300, 4
 // ---------- layouts ----------
 const indigo = { hue: 'indigo', tone: '500' };
 const base = (over: Partial<ChartSpec>): ChartSpec => ({
-  version: 3,
+  version: SPEC_VERSION,
   type: 'line',
   title: 'T',
   width: 800,
@@ -177,7 +178,7 @@ const v1 = {
   source: { kind: 'random', seriesCount: 1, points: 1, min: 0, max: 10, seed: 1, preset: 'numbers' },
 };
 const m = migrateSpec(v1);
-assert.equal(m.version, 3);
+assert.equal(m.version, SPEC_VERSION);
 assert.equal(m.type, 'line');
 assert.equal(m.options.stack, false);
 assert.equal(m.options.maxSlices, DEFAULT_OPTIONS.maxSlices);
@@ -313,3 +314,26 @@ assert.equal(mg.options.format.prefix, '₽');
 assert.equal(mg.options.format.separators, 'en');
 assert.deepEqual(mg.options.axis, DEFAULT_AXIS);
 console.log('migrate nested: ok');
+
+const compact = computeLayout(base({ width: 240, height: 60, options: { ...DEFAULT_OPTIONS, showTitle: false, showLegend: false, axis: { ...DEFAULT_AXIS, showX: false, showY: false, grid: false, titleX: 'X', titleY: 'Y' } } }), echartsTheme);
+assert.equal(compact.type, 'cartesian');
+if (compact.type === 'cartesian') {
+  assert.deepEqual(compact.grid, { x: 8, y: 8, w: 224, h: 44 });
+  assert.deepEqual([compact.xLabels, compact.yLabels, compact.xTicks, compact.yTicks], [[], [], [], []]);
+  assert.deepEqual([compact.xLine, compact.yLine, compact.titles.x, compact.titles.y], [null, null, null, null]);
+}
+for (const value of [-500, 0, 1000, 2000]) {
+  const l = computeLayout(base({ options: { ...DEFAULT_OPTIONS, threshold: { enabled: true, value } } }), echartsTheme);
+  assert.ok(l.type === 'cartesian' && l.threshold && l.threshold.y >= l.grid.y && l.threshold.y <= l.grid.y + l.grid.h);
+}
+const outside = computeLayout(base({ options: { ...DEFAULT_OPTIONS, threshold: { enabled: true, value: 200 }, axis: { ...DEFAULT_AXIS, min: 0, max: 100 } } }), echartsTheme);
+assert.ok(outside.type === 'cartesian' && outside.threshold === null && outside.warnings.length === 1);
+const ranked = base({ type: 'bar', categories: ['a', 'b', 'c', 'd'], series: [{ name: 'A', color: indigo, data: [1, 4, 4, null] }, { name: 'B', color: indigo, data: [10, 30, 20, 40] }], options: { ...DEFAULT_OPTIONS, horizontal: true, stack: true, topN: { enabled: true, count: 2, series: 0 } } });
+assert.deepEqual(displaySpec(ranked).categories, ['b', 'c']);
+assert.equal(displaySpec(ranked).options.stack, false);
+assert.deepEqual(ranked.categories, ['a', 'b', 'c', 'd']);
+const ranking = computeLayout(ranked, echartsTheme);
+assert.ok(ranking.type === 'cartesian' && ranking.bars.length === 2 && ranking.bars[0].y < ranking.bars[1].y);
+assert.deepEqual(migrateSpec({ version: 3 }).options.threshold, { enabled: false, value: 0 });
+assert.equal(migrateSpec({ version: 3 }).options.axis.showX, true);
+console.log('axes, threshold, Top-N: ok');

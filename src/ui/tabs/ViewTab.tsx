@@ -3,7 +3,7 @@ import type { TextStyleInfo } from '../../shared/messages';
 import type { Decimals, NumberFormat, TextStyleIds } from '../../shared/types';
 import { defaultColor } from '../../theme/palette';
 import { ColorPicker } from '../components/ColorPicker';
-import { Collapsible, OptionalNumberField, Row, Section, Segmented, Select, Slider, Stepper, TextField, Toggle } from '../components/controls';
+import { Collapsible, NumberField, OptionalNumberField, Row, Section, Segmented, Select, Slider, Stepper, TextField, Toggle } from '../components/controls';
 import type { Editor } from '../state';
 
 const MAX_SLICE_ROWS = 60;
@@ -67,6 +67,12 @@ export function ViewTab({ ed, textStyles, onStyle }: Props) {
           <Row label="Точки">
             <Toggle checked={o.showSymbols} onChange={(v) => ed.setOpt('showSymbols', v)} />
           </Row>
+          <Row label="Порог">
+            <div class="pair">
+              {o.threshold.enabled && <NumberField value={o.threshold.value} onChange={(value) => ed.setOpt('threshold', { ...o.threshold, value })} />}
+              <Toggle checked={o.threshold.enabled} onChange={(enabled) => ed.setOpt('threshold', { ...o.threshold, enabled })} />
+            </div>
+          </Row>
         </Section>
       )}
 
@@ -82,9 +88,16 @@ export function ViewTab({ ed, textStyles, onStyle }: Props) {
               onChange={(v) => ed.setOpt('horizontal', v === 'h')}
             />
           </Row>
-          <Row label="Накопление">
+          {!(o.horizontal && o.topN.enabled) && <Row label="Накопление">
             <Toggle checked={o.stack} onChange={(v) => ed.setOpt('stack', v)} />
-          </Row>
+          </Row>}
+          {o.horizontal && <>
+            <Row label="Top‑N"><Toggle checked={o.topN.enabled} onChange={(enabled) => ed.setOpt('topN', { ...o.topN, enabled })} /></Row>
+            {o.topN.enabled && <>
+              <Row label="Количество"><NumberField value={o.topN.count} min={1} max={500} onChange={(count) => ed.setOpt('topN', { ...o.topN, count: Math.max(1, Math.min(500, Math.round(count))) })} /></Row>
+              {table.data.length > 1 && <Row label="Показатель"><Select value={String(Math.min(o.topN.series, table.data.length - 1))} options={table.data.map((_, i) => ({ id: String(i), label: ed.meta[i].name }))} onChange={(series) => ed.setOpt('topN', { ...o.topN, series: Number(series) })} /></Row>}
+            </>}
+          </>}
         </Section>
       )}
 
@@ -129,9 +142,14 @@ export function ViewTab({ ed, textStyles, onStyle }: Props) {
           </Row>
         </Section>
       )}
+      {type === 'graph' && <Section title="Связи"><Row label="Стрелки"><Toggle checked={o.directed} onChange={(v) => ed.setOpt('directed', v)} /></Row></Section>}
 
       {(cartesian || type === 'radar') && (
         <Section title="Оси">
+          {cartesian && <>
+            <Row label="Ось X"><Toggle checked={ax.showX} onChange={(showX) => ed.setAxis({ showX })} /></Row>
+            <Row label="Ось Y"><Toggle checked={ax.showY} onChange={(showY) => ed.setAxis({ showY })} /></Row>
+          </>}
           <Row label={type === 'radar' ? 'Максимум' : 'Мин – макс'}>
             <div class="pair">
               {type !== 'radar' && (
@@ -146,12 +164,12 @@ export function ViewTab({ ed, textStyles, onStyle }: Props) {
           {badRange && <p class="hint error">Минимум должен быть меньше максимума — сейчас используется авто.</p>}
           {cartesian && (
             <>
-              <Row label="Название оси X">
+              {ax.showX && <Row label="Название оси X">
                 <TextField small value={ax.titleX} placeholder="нет" onInput={(v) => ed.setAxis({ titleX: v })} />
-              </Row>
-              <Row label="Название оси Y">
+              </Row>}
+              {ax.showY && <Row label="Название оси Y">
                 <TextField small value={ax.titleY} placeholder="нет" onInput={(v) => ed.setAxis({ titleY: v })} />
-              </Row>
+              </Row>}
             </>
           )}
           <Row label="Сетка">
@@ -165,7 +183,7 @@ export function ViewTab({ ed, textStyles, onStyle }: Props) {
         </Section>
       )}
 
-      {type !== 'pie' && (
+      {type !== 'pie' && type !== 'graph' && type !== 'gantt' && (
         <Section title="Формат чисел" aside={<span class="section-summary">{formatValue(-1234567.891, f)}</span>}>
           <Row label="Префикс · суффикс">
             <div class="pair">
@@ -186,12 +204,12 @@ export function ViewTab({ ed, textStyles, onStyle }: Props) {
       )}
 
       <Section title="Фрейм">
-        <Row label={type === 'pie' ? 'Подписи' : 'Значения'}>
+        {type !== 'graph' && type !== 'gantt' && <Row label={type === 'pie' ? 'Подписи' : 'Значения'}>
           <Toggle checked={o.showLabels} onChange={(v) => ed.setOpt('showLabels', v)} />
-        </Row>
-        <Row label="Легенда">
+        </Row>}
+        {!['heatmap', 'treemap', 'gantt'].includes(type) && <Row label="Легенда">
           <Toggle checked={o.showLegend} onChange={(v) => ed.setOpt('showLegend', v)} />
-        </Row>
+        </Row>}
         <Row label="Заголовок">
           <Toggle checked={o.showTitle} onChange={(v) => ed.setOpt('showTitle', v)} />
         </Row>

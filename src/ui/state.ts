@@ -1,12 +1,13 @@
 // Chart editor state for the UI: everything that becomes a ChartSpec, plus helpers shared by the tabs,
 // the CSV window and the presets menu. App.tsx owns messaging with the sandbox; tabs get the `Editor` object.
 
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { computeLayout } from '../core/layout';
 import { AUTO_SCATTER_POINTS, autoPoints, makeCategories, randomScatter, randomSeries, type CategoryPreset } from '../data/random';
 import type { ImportResult, TableData } from '../data/table';
 import type { TextStyleInfo } from '../shared/messages';
-import { DEFAULT_OPTIONS, SPEC_VERSION, type ChartOptions, type ChartSpec, type ChartType, type ColorRef, type TextStyleIds, type Value } from '../shared/types';
+import { DEFAULT_OPTIONS, SPEC_VERSION, isStructured, type StructuredType, type StructuredData, type ChartOptions, type ChartSpec, type ChartType, type ColorRef, type TextStyleIds, type Value } from '../shared/types';
+import { dataSheets, demoData, parseSheets, type DataSheet } from '../data/structured';
 import { echartsTheme } from '../theme/echarts';
 import { defaultColor } from '../theme/palette';
 
@@ -28,8 +29,8 @@ export type SourceKind = 'random' | 'table';
 
 export const MAX_SERIES = 8;
 export const MAX_POINTS = 365;
-export const MIN_W = 200;
-export const MIN_H = 150;
+export const MIN_W = 64;
+export const MIN_H = 40;
 export const MAX_SIZE = 4000;
 
 export const TYPE_LABELS: Record<ChartType, string> = {
@@ -38,6 +39,7 @@ export const TYPE_LABELS: Record<ChartType, string> = {
   pie: 'Круговая',
   scatter: 'Точечная',
   radar: 'Радар',
+  heatmap: 'Heatmap', graph: 'Граф связей', treemap: 'Treemap', sankey: 'Sankey', gantt: 'Диаграмма Ганта',
 };
 
 export const DEFAULT_TITLES: Record<ChartType, string> = {
@@ -46,6 +48,7 @@ export const DEFAULT_TITLES: Record<ChartType, string> = {
   pie: 'Pie Chart',
   scatter: 'Scatter Chart',
   radar: 'Radar Chart',
+  heatmap: 'Heatmap', graph: 'Граф связей', treemap: 'Treemap', sankey: 'Sankey', gantt: 'Диаграмма Ганта',
 };
 
 export const SIZE_PRESETS = [
@@ -167,6 +170,9 @@ export function useChartEditor() {
   const [ratio, setRatio] = useState<number | null>(null); // locked W / H
   const [options, setOptions] = useState<ChartOptions>(DEFAULT_OPTIONS);
   const [styleIds, setStyleIds] = useState<TextStyleIds>({});
+  const [sheetsByType, setSheetsByType] = useState<Partial<Record<StructuredType, DataSheet[]>>>({});
+  const validData = useRef<Partial<Record<StructuredType, StructuredData>>>({});
+  const [typeNotice, setTypeNotice] = useState('');
 
   const regenerate = (next: GenParams, t: ChartType = type) => {
     setParams(next);
@@ -177,7 +183,7 @@ export function useChartEditor() {
   // «Точки: авто» follows the width: regenerate (same seed) when the resolved count changes
   const resolvedPoints = resolvePoints(params, type, width);
   useEffect(() => {
-    if (sourceKind === 'random' && params.points === 'auto' && table.categories.length !== resolvedPoints) setTable(generate(params, type, width));
+    if (!isStructured(type) && sourceKind === 'random' && params.points === 'auto' && table.categories.length !== resolvedPoints) setTable(generate(params, type, width));
   }, [resolvedPoints, sourceKind, params.points]);
 
   const setSize = (w: number, h: number) => {
@@ -190,7 +196,12 @@ export function useChartEditor() {
 
   const changeType = (t: ChartType) => {
     if (t === type) return;
-    if (sourceKind === 'random' && (t === 'scatter') !== (type === 'scatter')) regenerate(params, t); // scatter: numeric X
+    if (!isStructured(type) && !isStructured(t) && sourceKind === 'random' && (t === 'scatter') !== (type === 'scatter')) regenerate(params, t);
+    if (isStructured(t)) {
+      if (!sheetsByType[t]) setSheetsByType(s => ({ ...s, [t]: dataSheets(demoData(t)) }));
+      setTypeNotice(sheetsByType[t] ? 'Восстановлены данные этого типа графика.' : 'Загружен пример для этого типа. Данные предыдущего типа сохранены отдельно.');
+    } else if (isStructured(type)) setTypeNotice('Восстановлена таблица обычных графиков.');
+    else setTypeNotice('');
     if (title === DEFAULT_TITLES[type]) setTitle(DEFAULT_TITLES[t]);
     setType(t);
   };
@@ -228,9 +239,16 @@ export function useChartEditor() {
   const loadSpec = (s: ChartSpec, size: { width: number; height: number }, styles: (ids: TextStyleIds) => TextStyleIds = (x) => x) => {
     const src = s.source?.kind === 'random' ? s.source : undefined;
     setType(s.type);
-    setSourceKind(src ? 'random' : 'table');
-    const values = s.series.flatMap((x) => x.data).filter((v): v is number => typeof v === 'number');
-    setParams({
+    setTypeNotice('');
+    if (isStructured(s.type)) {
+      const d = s.structured?.kind === s.type ? s.structured : demoData(s.type);
+      setSheetsByType(prev => ({ ...prev, [s.type]: dataSheets(d) }));
+      validData.current[d.kind] = d;
+    }
+    if (!isStructured(s.type)) {
+      setSourceKind(src ? 'random' : 'table');
+      const values = s.series.flatMap((x) => x.data).filter((v): v is number => typeof v === 'number');
+      setParams({
       seriesCount: Math.max(1, s.series.length),
       points: src?.points ?? Math.max(2, s.categories.length),
       min: src?.min ?? 0,
@@ -240,7 +258,8 @@ export function useChartEditor() {
     });
     setTable({ categories: s.categories, data: aligned(s.categories, s.series.map((x) => x.data)) });
     setMeta(Array.from({ length: MAX_SERIES }, (_, i) => (s.series[i] ? { name: s.series[i].name, color: s.series[i].color } : metaFor(i))));
-    setCatColors(s.categoryColors ?? []);
+      setCatColors(s.categoryColors ?? []);
+    }
     setTitle(s.title);
     setOptions({ ...DEFAULT_OPTIONS, ...s.options });
     setStyleIds((cur) => ({ ...cur, ...styles(s.textStyles) }));
@@ -249,15 +268,23 @@ export function useChartEditor() {
   };
 
   const { categories, data } = table;
+  const structuredType = isStructured(type) ? type : null;
+  const sheets = structuredType ? sheetsByType[structuredType] ?? dataSheets(demoData(structuredType)) : [];
+  const parsed = structuredType ? parseSheets(structuredType, sheets) : null;
+  if (parsed && !parsed.errors.length) validData.current[parsed.data.kind] = parsed.data;
+  const errors = parsed?.errors ?? [];
+  const structured = structuredType ? validData.current[structuredType] ?? demoData(structuredType) : undefined;
+  const setSheets = (next: DataSheet[]) => { if (structuredType) setSheetsByType(prev => ({ ...prev, [structuredType]: next })); };
   const spec: ChartSpec = {
     version: SPEC_VERSION,
     type,
-    source: sourceKind === 'random' ? { kind: 'random', ...params } : { kind: 'table' },
+    source: !structuredType && sourceKind === 'random' ? { kind: 'random', ...params } : { kind: 'table' },
+    structured,
     title,
     width,
     height,
-    categories,
-    series: aligned(categories, data).map((d, i) => ({ name: meta[i].name, color: meta[i].color, data: d })),
+    categories: structuredType ? [] : categories,
+    series: structuredType ? [] : aligned(categories, data).map((d, i) => ({ name: meta[i].name, color: meta[i].color, data: d })),
     categoryColors: type === 'pie' ? categories.map((_, i) => catColors[i] ?? defaultColor(i)) : undefined,
     options,
     textStyles: styleIds,
@@ -265,6 +292,7 @@ export function useChartEditor() {
   const layout = computeLayout(spec, echartsTheme);
 
   return {
+    sheets, setSheets, errors, typeNotice,
     type,
     sourceKind,
     params,

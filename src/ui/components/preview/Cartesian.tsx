@@ -64,6 +64,10 @@ export function CartesianBody({ L, spec, theme }: BodyProps<CartesianLayout>) {
         <Mark key={`v${i}`} m={m} size={font} fill={hex(c.valueLabel)} />
       ))}
       </g>
+      {L.threshold && <g>
+        <line x1={g.x} x2={g.x + g.w} y1={L.threshold.y} y2={L.threshold.y} stroke={hex(theme.threshold.color)} stroke-width={theme.threshold.width} stroke-dasharray={theme.threshold.dash.join(' ')} />
+        <Mark m={L.threshold.label} size={font} fill={hex(theme.threshold.color)} />
+      </g>}
       {L.titles.x && <Mark m={L.titles.x} size={font} fill={hex(c.axisLabel)} />}
       {L.titles.y && (
         <g transform={`rotate(-90 ${L.titles.y.x} ${L.titles.y.y})`}>

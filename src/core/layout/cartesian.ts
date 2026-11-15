@@ -63,6 +63,8 @@ export interface CartesianLayout {
   titles: { x: TextMark | null; y: TextMark | null };
   /** user-set value bounds → the plot clips the series */
   clip: boolean;
+  threshold: { y: number; label: TextMark } | null;
+  warnings: string[];
 }
 
 const at = (data: Value[], i: number): Value => (i < data.length ? data[i] : null);
@@ -101,7 +103,8 @@ function valueRange(spec: ChartSpec, count: number): [number, number] {
 export function computeCartesianLayout(spec: ChartSpec, theme: ThemeSpec, frame: FrameLayout = frameLayout(spec, theme, [], 'line')): CartesianLayout {
   const chart = spec.type as CartesianLayout['chart'];
   const o = spec.options;
-  const p = theme.padding;
+  const compact = chart === 'line' && !o.axis.showX && !o.axis.showY && !o.showTitle && !o.showLegend;
+  const p = compact ? { ...theme.padding, left: 8, right: 8 } : theme.padding;
   const font = theme.fonts.axis.size;
   const W = spec.width;
   const b = frame.body;
@@ -111,14 +114,16 @@ export function computeCartesianLayout(spec: ChartSpec, theme: ThemeSpec, frame:
   const ax = o.axis;
   const fmt = o.format;
   const fixed = { min: ax.min, max: ax.max };
-  const titleX = ax.titleX.trim();
-  const titleY = ax.titleY.trim();
+  const titleX = ax.showX ? ax.titleX.trim() : '';
+  const titleY = ax.showY ? ax.titleY.trim() : '';
   const top = b.y;
-  const bottom = b.y + b.h - theme.xLabelHeight - (titleX ? theme.axisTitleHeight : 0);
+  const bottom = b.y + b.h - (ax.showX ? theme.xLabelHeight : 0) - (titleX ? theme.axisTitleHeight : 0);
   const gh = Math.max(10, bottom - top);
 
   // ---- vertical (left) axis first: its label width sets the left inset ----
-  const [vMin, vMax] = valueRange(spec, count);
+  let [vMin, vMax] = valueRange(spec, count);
+  const threshold = chart === 'line' && o.threshold.enabled && Number.isFinite(o.threshold.value) ? o.threshold.value : null;
+  if (threshold !== null) { vMin = Math.min(vMin, threshold); vMax = Math.max(vMax, threshold); }
   let yCat: CategoryAxis | null = null;
   let yVal: ValueAxis | null = null;
   let leftLabelW: number;
@@ -131,7 +136,7 @@ export function computeCartesianLayout(spec: ChartSpec, theme: ThemeSpec, frame:
     leftLabelW = yVal.ticks.reduce((m, t) => Math.max(m, estimateTextWidth(t.label, font)), 0);
   }
   const titleW = titleY ? theme.axisTitleHeight : 0;
-  const left = titleW + Math.min(Math.max(p.left, Math.ceil(leftLabelW + theme.axisLabelMargin + 12)), W * 0.4);
+  const left = ax.showY ? titleW + Math.min(Math.max(p.left, Math.ceil(leftLabelW + theme.axisLabelMargin + 12)), W * 0.4) : 8;
   const gw = Math.max(10, W - left - p.right);
   const grid: Rect = { x: left, y: top, w: gw, h: gh };
 
@@ -175,6 +180,8 @@ export function computeCartesianLayout(spec: ChartSpec, theme: ThemeSpec, frame:
       y: titleY ? { x: b.x + 4 + theme.axisTitleHeight / 2, y: grid.y + grid.h / 2, text: titleY, ax: 0.5, ay: 0.5 } : null,
     },
     clip: ax.min !== null || ax.max !== null,
+    threshold: null,
+    warnings: [],
   };
 
   // axes → labels, ticks, split lines
@@ -196,14 +203,14 @@ export function computeCartesianLayout(spec: ChartSpec, theme: ThemeSpec, frame:
     for (let i = 0; i < count; i++) if (xCat.isShown(i)) L.xLabels.push({ pos: xCat.pos(i), text: spec.categories[i] });
     L.xTicks = catTicks(xCat, grid.x, chart === 'bar');
     L.xLine = yOf(zero(yVal!));
-    L.splitY = L.splitY.filter((y) => Math.abs(y - L.xLine!) > 0.5); // the axis line replaces that split line
+    if (ax.showX) L.splitY = L.splitY.filter((y) => Math.abs(y - L.xLine!) > 0.5);
     L.category = { total: count, shown: xCat.shownCount, interval: xCat.interval };
   }
   if (yCat) {
     for (let i = 0; i < count; i++) if (yCat.isShown(i)) L.yLabels.push({ pos: yCat.pos(i), text: spec.categories[i] });
     L.yTicks = catTicks(yCat, grid.y, true);
     L.yLine = xOf(zero(xVal!));
-    L.splitX = L.splitX.filter((x) => Math.abs(x - L.yLine!) > 0.5);
+    if (ax.showY) L.splitX = L.splitX.filter((x) => Math.abs(x - L.yLine!) > 0.5);
     L.category = { total: count, shown: yCat.shownCount, interval: yCat.interval };
   }
 
@@ -214,6 +221,15 @@ export function computeCartesianLayout(spec: ChartSpec, theme: ThemeSpec, frame:
   if (!ax.ticks) {
     L.xTicks = [];
     L.yTicks = [];
+  }
+  if (!ax.showX) { L.xLabels = []; L.xTicks = []; L.xLine = null; }
+  if (!ax.showY) { L.yLabels = []; L.yTicks = []; L.yLine = null; }
+  if (threshold !== null && yVal) {
+    if (threshold < yVal.scale.min || threshold > yVal.scale.max) L.warnings.push('Порог находится вне заданных границ оси.');
+    else {
+      const y = yOf(threshold);
+      L.threshold = { y, label: { x: grid.x + grid.w - 4, y: Math.max(grid.y + 2, y - 4), ax: 1, ay: y - grid.y < font + 4 ? 0 : 1, text: formatValue(threshold, fmt) } };
+    }
   }
 
   const labels: (TextMark & { series: number })[] = [];

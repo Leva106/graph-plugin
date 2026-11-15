@@ -15,6 +15,7 @@ export function migrateSpec(raw: any): ChartSpec {
   return {
     version: SPEC_VERSION,
     type,
+    structured: s.structured?.kind === type ? s.structured : undefined,
     source: s.source?.kind === 'random' || s.source?.kind === 'table' ? s.source : undefined,
     title: typeof s.title === 'string' ? s.title : '',
     width: Number(s.width) || 800,
@@ -33,6 +34,8 @@ export function migrateSpec(raw: any): ChartSpec {
       // nested groups added later: fill missing fields one by one
       format: { ...DEFAULT_FORMAT, ...(s.options?.format ?? {}) },
       axis: { ...DEFAULT_AXIS, ...(s.options?.axis ?? {}) },
+      threshold: { ...DEFAULT_OPTIONS.threshold, ...(s.options?.threshold ?? {}) },
+      topN: { ...DEFAULT_OPTIONS.topN, ...(s.options?.topN ?? {}) },
     },
     textStyles: s.textStyles ?? {},
   };
